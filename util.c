@@ -3,10 +3,11 @@
 #include <errno.h>
 #include <string.h>
 #include <stdarg.h>
+#include <sys/stat.h>
 #include <sys/ioctl.h>
 
 #include "util.h"
-#include "sha256.h"
+#include "sha256/sha256.h"
 
 char *argv0;
 
@@ -66,15 +67,31 @@ makeSHA256(const char *path, char *hash)
 	size_t size;
 	struct sha256_buff buff;
 
-	file = fopen(path, "rb");
-	sha256_init(&buff);
-	while (!feof(file)) {
-		// Hash file by 1kb chunks, instead of loading into RAM at once
-		size = fread(buffer, 1, 1024, file);
-		sha256_update(&buff, buffer, size);
+	struct stat fileStats;
+
+	if (stat(path, &fileStats) == -1) {
+		warn("Cant get info about file: %s", path);
 	}
-	sha256_finalize(&buff);
-	sha256_read_hex(&buff, hash);
+	else
+	{
+		if (!S_ISDIR(fileStats.st_mode))
+		{
+			file = fopen(path, "rb");
+			sha256_init(&buff);
+			while (!feof(file)) {
+				// Hash file by 1kb chunks, instead of loading into RAM at once
+				size = fread(buffer, 1, 1024, file);
+				sha256_update(&buff, buffer, size);
+			}
+			sha256_finalize(&buff);
+			sha256_read_hex(&buff, hash);
+		}
+		else
+		{
+			sprintf(hash,
+					"%c", '\0');
+		}
+	}
 }
 
 static int

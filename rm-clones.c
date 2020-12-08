@@ -7,7 +7,7 @@
 #include <sys/stat.h>
 
 #include "rm-clones.h"
-#include "sha256.h"
+#include "sha256/sha256.h"
 #include "util.h"
 
 struct fas {
@@ -32,9 +32,14 @@ usage()
 static int
 preScan(const char *root, int recursive)
 {
+	char cur_file[PATH_MAX];
 	char path[PATH_MAX];
+	char rpath[PATH_MAX];
 	int total_files;
 	int tmp;
+
+	struct stat fileStats;
+
 	DIR *d;
 	struct dirent *dir;
 
@@ -51,9 +56,29 @@ preScan(const char *root, int recursive)
 	total_files = 0;
 	while ((dir = readdir(d)) != NULL)
 	{
+		if (snprintf(cur_file, sizeof(cur_file),
+				"%s", dir->d_name) == 0) {
+			warn("Cant read file name");
+			continue;
+		}
+		if ((snprintf(path, sizeof(char) * PATH_MAX,
+				"%s/%s", root, cur_file)) < 1) {
+			warn("Cant fill path");
+			continue;
+		}
+		if (realpath(path, rpath) == NULL) {
+			warn("realpath:");
+			continue;
+		}
+
+		if (lstat(rpath, &fileStats) == -1) {
+			warn("Cant get stats of file: %s", rpath);
+			continue;
+		}
+
 		if (recursive == 1)
 		{
-			if (dir->d_type == DT_DIR &&
+			if (S_ISDIR(fileStats.st_mode) &&
 					strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..") != 0)
 			{
 				snprintf(path, sizeof(path),
@@ -64,7 +89,7 @@ preScan(const char *root, int recursive)
 			} else if (dir->d_type != DT_DIR) {
 				total_files++;
 			}
-		} else if (dir->d_type != DT_DIR) {
+		} else if (!S_ISDIR(fileStats.st_mode)) {
 			total_files++;
 		}
 	}
@@ -80,6 +105,7 @@ preScan(const char *root, int recursive)
 static int
 scan(const char *root, int processed, int recursive)
 {
+	int tmp;
 	char cur_file[MAX_FILE_NAME];
 	char path[PATH_MAX];
 	char rpath[PATH_MAX];
@@ -97,17 +123,17 @@ scan(const char *root, int processed, int recursive)
 
 	if ((d = opendir(root)) == NULL) {
 		warn("Cant open dir: %s", root);
-		return -1;
+		return processed;
 	}
 
 	total_files = preScan(root, recursive);
 
 	if (total_files == 0) {
 		printf("Nothing to do in dir: %s\n", root);
-		return 0;
+		return processed;
 	} else if (total_files == -1) {
 		warn("An error resived while prescaning dir: %s", root);
-		return -1;
+		return processed;
 	} else if (total_files > MAX_FILES) {
 		total_files = MAX_FILES - 1;
 		warn("Too many files in dir: %s", root);
@@ -118,7 +144,7 @@ scan(const char *root, int processed, int recursive)
 
 	if ((d = opendir(root)) == NULL) {
 		warn("Cant open dir: %s", root);
-		return -1;
+		return processed;
 	}
 	
 	while ((dir = readdir(d)) != NULL && processed < MAX_FILES)
@@ -144,31 +170,56 @@ scan(const char *root, int processed, int recursive)
 			continue;
 		}
 
-		/* strcmp(cur_file, ".") != 0 && strcmp(cur_file, "..") != 0 */
-
-		if (! S_ISDIR(fileStats.st_mode))
+		if (recursive == 1)
 		{
-			if (lstat(path, &fileStats) == -1) {
-				warn("Cant get stats of file: %s", path);
-				continue;
+			if (S_ISDIR(fileStats.st_mode) &&
+					strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..") != 0)
+			{
+				processed += scan(path, processed, 1);
 			}
+			else
+			{
+				if (lstat(path, &fileStats) == -1) {
+					warn("Cant get stats of file: %s", path);
+					continue;
+				}
 
-			makeSHA256(S_ISLNK(fileStats.st_mode) ? path : rpath, hash);
+				makeSHA256(S_ISLNK(fileStats.st_mode) ? path : rpath, hash);
 
-			if (fillFileEntry(S_ISLNK(fileStats.st_mode) ? path : rpath, hash, processed) == -1) {
-				warn("Cant fill entry №.%d", processed);
-				continue;
+				if (fillFileEntry(S_ISLNK(fileStats.st_mode) ? path : rpath, hash, processed) == -1) {
+					warn("Cant fill entry №.%d", processed);
+					continue;
+				}
+
+				processed++;
 			}
+		}
+		else
+		{
+			if (! S_ISDIR(fileStats.st_mode))
+			{
+				if (lstat(path, &fileStats) == -1) {
+					warn("Cant get stats of file: %s", path);
+					continue;
+				}
 
-			processed++;
+				makeSHA256(S_ISLNK(fileStats.st_mode) ? path : rpath, hash);
 
-			progressBar(processed, total_files);
+				if (fillFileEntry(S_ISLNK(fileStats.st_mode) ? path : rpath, hash, processed) == -1) {
+					warn("Cant fill entry №.%d", processed);
+					continue;
+				}
+
+				processed++;
+
+				progressBar(processed, total_files);
+			}
 		}
 	}
 
 	if (closedir(d) == -1) {
 		warn("Cant close dir: %s", root);
-		return -1;
+		return processed;
 	}
 
 	return processed;
@@ -297,6 +348,7 @@ main(int argc, char *argv[])
 			continue;
 		}
 		
+		printf("processed: %d\n", processed);
 		if (checkFileClones(processed, qflag) == -1) {
 			warn("Some error while looking for file clones");
 		}
