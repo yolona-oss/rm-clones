@@ -1,0 +1,6 @@
+#sha256/.git
+#sha256/.gitignore
+#sha256/README.md
+#sha256/hash_file.c
+#sha256
+!sha256/sha256.[ch]
