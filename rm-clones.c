@@ -175,7 +175,7 @@ scan(const char *root, int processed, int recursive)
 			if (S_ISDIR(fileStats.st_mode) &&
 					strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..") != 0)
 			{
-				processed += scan(path, processed, 1);
+				processed = scan(path, processed, 1);
 			}
 			else
 			{
