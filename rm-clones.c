@@ -83,7 +83,7 @@ preScan(const char *root, int recursive)
 			{
 				snprintf(path, sizeof(path),
 						"%s/%s", root, dir->d_name);
-				if ((tmp = preScan(path, 1)) > 0) {
+				if ((tmp = preScan(path, recursive)) > 0) {
 					total_files += tmp;
 				}
 			} else if (dir->d_type != DT_DIR) {
@@ -111,15 +111,13 @@ scan(const char *root, int processed, int recursive)
 	char rpath[PATH_MAX];
 	int iterations = 1;
 	int total_files;
-	static char hash[65] = {0};
+	char hash[65] = {0};
 
 	struct stat fileStats;
 	int fileStatus;
 
 	DIR *d;
 	struct dirent *dir;
-
-	printf("Scaning dir: %s\n", root);
 
 	if ((d = opendir(root)) == NULL) {
 		warn("Cant open dir: %s", root);
@@ -175,7 +173,7 @@ scan(const char *root, int processed, int recursive)
 			if (S_ISDIR(fileStats.st_mode) &&
 					strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..") != 0)
 			{
-				processed = scan(path, processed, 1);
+				processed = scan(path, processed, recursive);
 			}
 			else
 			{
@@ -185,6 +183,9 @@ scan(const char *root, int processed, int recursive)
 				}
 
 				makeSHA256(S_ISLNK(fileStats.st_mode) ? path : rpath, hash);
+				if ((int)(hash) == HASH_DIR) {
+					continue;
+				}
 
 				if (fillFileEntry(S_ISLNK(fileStats.st_mode) ? path : rpath, hash, processed) == -1) {
 					warn("Cant fill entry №.%d", processed);
@@ -193,6 +194,8 @@ scan(const char *root, int processed, int recursive)
 
 				processed++;
 			}
+
+			/* progressLine(root, processed, total_files); */
 		}
 		else
 		{
@@ -212,7 +215,7 @@ scan(const char *root, int processed, int recursive)
 
 				processed++;
 
-				progressBar(processed, total_files);
+				progressLine(root, processed, total_files);
 			}
 		}
 	}
@@ -228,8 +231,6 @@ scan(const char *root, int processed, int recursive)
 int
 wipeEntry(int i)
 {
-	/* sprintf(FilesAndChecks[i].file_name, */
-	/* 		"%c", '\0'); */
 	int ret = sprintf(FilesAndChecks[i].checksum,
 			"%c", '\0');
 

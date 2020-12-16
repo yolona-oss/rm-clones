@@ -1,10 +1,10 @@
-#define MAX_BAR_LEN 256
+#define MAX_BAR_LEN 64
 #define MAX_FILES 10000
 #define MAX_FILE_NAME 256
 #define MAX_CLONES 256
 #define CHECKSUMM_SIZE 256
 
-#define DIG getDigits(MAX_FILES)
+#define HASH_DIR -2
 
 extern char *argv0;
 
@@ -15,4 +15,4 @@ void die(const char *fmt, ...);
 int getCols(void);
 int wipeEntry(int index);
 void makeSHA256(const char *path, char *hash);
-void progressBar(int cur, int total);
+void progressLine(const char *text, int cur, int total);

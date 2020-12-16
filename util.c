@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <limits.h>
 #include <errno.h>
 #include <string.h>
 #include <stdarg.h>
@@ -89,7 +90,7 @@ makeSHA256(const char *path, char *hash)
 		else
 		{
 			sprintf(hash,
-					"%c", '\0');
+					"%d", HASH_DIR);
 		}
 	}
 }
@@ -106,28 +107,68 @@ getDigits(int long n)
 	return d;
 }
 
-void
-progressBar(int cur, int total)
-{
+static void
+cut(char *str, char *res, int width) {
+	if (strlen(str) > 1) {
+		snprintf(res, sizeof(char) * (width - 2),
+				"%s...", str);
+	} else {
+		sprintf(res,
+				"%s", str);
+	}
+}
+
+static int
+mkProgBar(char *res, double perc, int len) {
 	int bp;
 	char bar[MAX_BAR_LEN];
-	int columns = getCols();
-	int barLen = columns - 34 - DIG;
-	if (barLen > MAX_BAR_LEN) {
-		barLen = MAX_BAR_LEN;
-	}
-	int perc;
 
-	perc = cur * 100 / total;
-
-	// cant handle too wide screens
-	for (bp = 0; bp < cur * barLen / total - 1; bp++)
+	for (bp = 0; bp < perc*len - 1; bp++)
 		bar[bp] = '=';
 	bar[bp] = '>';
-	for (bp++; bp < barLen; bp++) {
+	for (bp++; bp < len; bp++) {
 		bar[bp] = '-';
 	}
 	bar[bp] = '\0';
-	printf("\rScanning files. %*d remainig. [%s] %3d%%", DIG, total - cur, bar, perc);
+
+	int ret = sprintf(res,
+			"[%s] %3.0f%%", bar, perc*100);
+
+	return ret;
+}
+
+void
+progressLine(const char *text, int cur, int total)
+{
+	int bp;
+	char bar[MAX_BAR_LEN];
+	int barLen, prefix_len, padding_len;
+	int columns = getCols();
+	double perc;
+
+	perc = (double)cur / total;
+
+	char prefix[PATH_MAX+20];
+
+	prefix_len = sprintf(prefix,
+					"Scaning in %s", text);
+
+	barLen = columns - prefix_len - 8;
+	if (barLen > MAX_BAR_LEN)
+	{
+		barLen = MAX_BAR_LEN - 8;
+	}
+	int pbl = mkProgBar(bar, perc, barLen);
+
+	padding_len = columns - prefix_len - pbl;
+
+	if (prefix_len >= columns) {
+		char tmp[prefix_len];
+		cut(prefix, tmp, columns);
+		printf("\r%s", tmp);
+	} else {
+		printf("\r%s %*s", prefix, pbl+padding_len-1, bar);
+	}
+
 	fflush(stdout);
 }

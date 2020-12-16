@@ -1,4 +1,3 @@
-
 extern char *argv0;
 
 static void usage();
