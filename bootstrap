@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 
-SHA256_VERSION="cedd214c72fb0a9e12f43499081ff43870286ac4"
+SHA256_VERSION="8b1f77bf7588cc63d4ae4677e2d97384f97089b3"
 
 function get_sha256()
 {
