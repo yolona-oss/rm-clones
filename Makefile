@@ -1,4 +1,4 @@
-CC=gcc
+CC = gcc
 
 INC        =
 LDFLAGS    =
@@ -15,15 +15,15 @@ all: options $(SOURCES) $(EXECUTABLE)
 
 options:
 	@echo build options:
-	@echo "CFLAGS	= $(CFLAGS)"
+	@echo "CFLAGS   = $(CFLAGS)"
 	@echo "CPPFLAGS = $(CPPFLAGS)"
-	@echo "LDFLAGS	= $(LDFLAGS)"
-	@echo "CC	= $(CC)"
+	@echo "LDFLAGS  = $(LDFLAGS)"
+	@echo "CC       = $(CC)"
 		
 $(EXECUTABLE): $(OBJECTS) 
 	$(CC) $(LDFLAGS) $(OBJECTS) -o $@ $(LDLIBS)
 
-.c.o:
+OBJECTS:
 	$(CC) -o $@ -c $(CPPFLAGS) $(CFLAGS) $<
 		
 install: all

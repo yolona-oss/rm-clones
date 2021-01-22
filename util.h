@@ -4,7 +4,7 @@
 #define MAX_CLONES 256
 #define CHECKSUMM_SIZE 256
 
-#define HASH_DIR -2
+#define HASH_DIR "HASH_DIR_ERR"
 
 extern char *argv0;
 

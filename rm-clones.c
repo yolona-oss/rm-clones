@@ -26,7 +26,7 @@ static struct faf FilesAndClones[MAX_FILES];
 static void
 usage()
 {
-	die("[-r|--recursive] [-q|--force] <DIR>...");
+	die("[-r|--recursive] [-f|--force] <DIR>...");
 }
 
 static int
@@ -36,6 +36,7 @@ preScan(const char *root, int recursive)
 	char path[PATH_MAX];
 	char rpath[PATH_MAX];
 	int total_files;
+	int total_dirs;
 	int tmp;
 
 	struct stat fileStats;
@@ -54,6 +55,7 @@ preScan(const char *root, int recursive)
 	}
 
 	total_files = 0;
+	total_dirs = 0;
 	while ((dir = readdir(d)) != NULL)
 	{
 		if (snprintf(cur_file, sizeof(cur_file),
@@ -78,14 +80,22 @@ preScan(const char *root, int recursive)
 
 		if (recursive == 1)
 		{
+			/* if (S_ISDIR(fileStats.st_mode) && */
+			/* 		strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..") != 0) */
+			/* { */
+			/* 	snprintf(path, sizeof(path), */
+			/* 			"%s/%s", root, dir->d_name); */
+			/* 	if ((tmp = preScan(path, recursive)) > 0) { */
+			/* 		total_files += tmp; */
+			/* 	} */
+			/* } else if (dir->d_type != DT_DIR) { */
+			/* 	total_files++; */
+			/* } */
+			
 			if (S_ISDIR(fileStats.st_mode) &&
-					strcmp(dir->d_name, ".") != 0 && strcmp(dir->d_name, "..") != 0)
+					strcmp(cur_file, ".") != 0 && strcmp(cur_file, "..") != 0)
 			{
-				snprintf(path, sizeof(path),
-						"%s/%s", root, dir->d_name);
-				if ((tmp = preScan(path, recursive)) > 0) {
-					total_files += tmp;
-				}
+				total_files++;
 			} else if (dir->d_type != DT_DIR) {
 				total_files++;
 			}
@@ -106,6 +116,7 @@ static int
 scan(const char *root, int processed, int recursive)
 {
 	int tmp;
+	int cur_processed;
 	char cur_file[MAX_FILE_NAME];
 	char path[PATH_MAX];
 	char rpath[PATH_MAX];
@@ -118,11 +129,6 @@ scan(const char *root, int processed, int recursive)
 
 	DIR *d;
 	struct dirent *dir;
-
-	if ((d = opendir(root)) == NULL) {
-		warn("Cant open dir: %s", root);
-		return processed;
-	}
 
 	total_files = preScan(root, recursive);
 
@@ -137,7 +143,8 @@ scan(const char *root, int processed, int recursive)
 		warn("Too many files in dir: %s", root);
 		warn("Only %d will be processed", total_files);
 	} else {
-		printf("%d files found\n", total_files);
+		/* printf("%d files found\n", total_files); */
+		;
 	}
 
 	if ((d = opendir(root)) == NULL) {
@@ -145,6 +152,7 @@ scan(const char *root, int processed, int recursive)
 		return processed;
 	}
 	
+	cur_processed = 0;
 	while ((dir = readdir(d)) != NULL && processed < MAX_FILES)
 	{
 		if (snprintf(cur_file, sizeof(cur_file),
@@ -183,7 +191,7 @@ scan(const char *root, int processed, int recursive)
 				}
 
 				makeSHA256(S_ISLNK(fileStats.st_mode) ? path : rpath, hash);
-				if ((int)(hash) == HASH_DIR) {
+				if (strcmp(hash, HASH_DIR) == 0) {
 					continue;
 				}
 
@@ -195,7 +203,8 @@ scan(const char *root, int processed, int recursive)
 				processed++;
 			}
 
-			/* progressLine(root, processed, total_files); */
+			cur_processed++;
+			progressLine(root, cur_processed, total_files);
 		}
 		else
 		{
@@ -214,9 +223,10 @@ scan(const char *root, int processed, int recursive)
 				}
 
 				processed++;
-
-				progressLine(root, processed, total_files);
 			}
+
+			cur_processed++;
+			progressLine(root, cur_processed, total_files);
 		}
 	}
 
@@ -225,10 +235,11 @@ scan(const char *root, int processed, int recursive)
 		return processed;
 	}
 
+	printf("\n");
 	return processed;
 }
 
-int
+static int
 wipeEntry(int i)
 {
 	int ret = sprintf(FilesAndChecks[i].checksum,
@@ -243,7 +254,10 @@ checkFileClones(int total, int force)
 	printf("\nLooking for matches\n");
 
 	int clones_count = 0;
-	int cur, clone;
+	int cur, clone, f, cur_clone;
+
+	f = 0;
+	cur_clone = 0;
 	for (cur = 0; cur < total; cur++)
 	{
 		for (clone = 0; clone < total; clone++)
@@ -252,21 +266,48 @@ checkFileClones(int total, int force)
 					strcmp(FilesAndChecks[cur].checksum,
 						   FilesAndChecks[clone].checksum) == 0)
 			{
-				wipeEntry(clone);
-
 				if (force == 1) {
 					unlink(FilesAndChecks[clone].file_name);
 				} else {
-					printf("%s and %s\n", FilesAndChecks[cur].file_name,
-							FilesAndChecks[clone].file_name);
+					/* printf("%s and %s\n", FilesAndChecks[cur].file_name, */
+					/* 		FilesAndChecks[clone].file_name); */
+					sprintf(FilesAndClones[f].file,
+						"%s", FilesAndChecks[cur].file_name);
+					sprintf(FilesAndClones[f].clone_file[cur_clone],
+						"%s", FilesAndChecks[clone].file_name);
+					cur_clone++;
 				}
 
+				wipeEntry(clone);
 				clones_count++;
 			}
+
+			sprintf(FilesAndClones[f].clone_file[cur_clone],
+					END_CLONES_LIST_SIGN);
 		}
+
+		f++;
 	}
 
-	printf("Found %d clones\n", clones_count);
+	for (int i = 0; i < f; i++)
+	{
+		if(FilesAndClones[i].file[0] == '\0') {
+			continue;
+		}
+
+		printf("%s\n", FilesAndClones[i].file);
+
+		for (int j = 0; strcmp(FilesAndClones[i].clone_file[j], END_CLONES_LIST_SIGN) != 0; j++)
+		{
+			if(FilesAndClones[i].clone_file[j][0] == '\0') {
+				continue;
+			}
+			printf("\t%s\n", FilesAndClones[i].clone_file[j]);
+		}
+		fflush(stdout);
+	}
+
+	printf("\nFound %d clones\n", clones_count);
 
 	return 0;
 }
@@ -283,6 +324,24 @@ fillFileEntry(const char *path, const char *hash, int i)
 	if(snprintf(FilesAndChecks[i].checksum, sizeof(char) * CHECKSUMM_SIZE,
 			"%s", hash) == 0) {
 		warn("Cant get file hash");
+		return -1;
+	}
+
+	return 0;
+}
+
+static int
+fillFileNClonesEntry(const char *file, const char *clone, int i, int j)
+{
+	if(sprintf(FilesAndClones[i].file,
+			"%s", file) == 0) {
+		warn("Cant read file name");
+		return -1;
+	}
+	
+	if(sprintf(FilesAndClones[i].clone_file[j],
+			"%s", clone) == 0) {
+		warn("Cant read clone name");
 		return -1;
 	}
 
@@ -315,7 +374,7 @@ main(int argc, char *argv[])
 				rflag = 1;
 			} else if (strcmp(*argv, "recursive") == 0) {
 				rflag = 1;
-			} else if (strcmp(*argv, "q") == 0) {
+			} else if (strcmp(*argv, "f") == 0) {
 				qflag = 1;
 			} else if (strcmp(*argv, "force") == 0) {
 				qflag = 1;
@@ -329,6 +388,7 @@ main(int argc, char *argv[])
 	}
 
 	if (! *argv) {
+		usage();
 		die("No directory path specified");
 	}
 
@@ -351,7 +411,7 @@ main(int argc, char *argv[])
 		
 		printf("processed: %d\n", processed);
 		if (checkFileClones(processed, qflag) == -1) {
-			warn("Some error while looking for file clones");
+			warn("An error recived while looking for file clones");
 		}
 	}
 	

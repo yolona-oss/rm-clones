@@ -86,11 +86,12 @@ makeSHA256(const char *path, char *hash)
 			}
 			sha256_finalize(&buff);
 			sha256_read_hex(&buff, hash);
+			fclose(file);
 		}
 		else
 		{
 			sprintf(hash,
-					"%d", HASH_DIR);
+					"%s", HASH_DIR);
 		}
 	}
 }
@@ -111,7 +112,8 @@ static void
 cut(char *str, char *res, int width) {
 	if (strlen(str) > 1) {
 		snprintf(res, sizeof(char) * (width - 2),
-				"%s...", str);
+				"%s", str);
+		strcat(res, "...");
 	} else {
 		sprintf(res,
 				"%s", str);

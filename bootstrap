@@ -1,0 +1,34 @@
+#!/usr/bin/env bash
+
+SHA256_VERSION="cedd214c72fb0a9e12f43499081ff43870286ac4"
+
+function get_sha256()
+{
+	if [[ -s "sha256/sha256.c" ]]; then
+		return 0
+	fi
+
+	if [[ ! $(which git) ]]; then
+		return 1
+	fi
+
+	git clone "https://github.com/LekKit/sha256.git" sha256
+	cd sha256
+
+	#mb check git exit code
+	if [[ ! -s "sha256.c" ]]; then
+		cd -
+		return 2
+	fi
+
+	git reset --hard ${SHA256_VERSION}
+	cd -
+
+	return 0
+}
+
+if (( $(get_sha256) )); then
+	echo "Cant get sha256"
+else
+	echo "sha256 getted successfully"
+fi
